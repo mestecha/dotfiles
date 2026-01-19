@@ -1,0 +1,42 @@
+#
+# inputrc - readline configuration
+#
+
+# case-insensitive completion
+set completion-ignore-case on
+
+# show all matches if ambiguous
+set show-all-if-ambiguous on
+
+# trailing slash for symlinked directories
+set mark-symlinked-directories on
+
+# show all completions at once
+set page-completions off
+
+# ask if more than 200 completions
+set completion-query-items 200
+
+# only show hidden files if pattern starts with dot
+set match-hidden-files off
+
+# show file type indicator like ls -F
+set visible-stats on
+
+# smarter completion with cursor in middle of word
+set skip-completed-text on
+
+# utf-8 support
+set input-meta on
+set output-meta on
+set convert-meta off
+
+# shift-tab to cycle through completions
+"\e[Z": menu-complete
+
+# up/down searches history with typed prefix
+"\e[A": history-search-backward
+"\e[B": history-search-forward
+
+# alt-delete to delete word
+"\e[3;3~": kill-word
