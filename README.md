@@ -1,20 +1,8 @@
 # dotfiles
 
-personal dotfiles for bash on linux (wsl) and macos.
+personal dotfiles for bash/zsh on linux and macos.
 
 based on [bahamas10's dotfiles](https://github.com/bahamas10/dotfiles).
-
-## requirements
-
-- neovim 0.10+ (for nvim-treesitter)
-- gcc (for compiling treesitter parsers)
-- curl, tar (for downloads)
-
-```bash
-# ubuntu/wsl - install neovim from ppa
-sudo add-apt-repository -y ppa:neovim-ppa/unstable
-sudo apt update && sudo apt install -y neovim
-```
 
 ## install
 
@@ -22,23 +10,30 @@ sudo apt update && sudo apt install -y neovim
 git clone https://github.com/mestecha/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 ./install      # without gitconfig
-./install -f   # with gitconfig (includes my identity)
+./install -f   # with gitconfig (includes identity)
 ```
 
-the install script will:
-- symlink all dotfiles to home
-- install bics (bash plugin manager)
-- install tree-sitter-cli (for nvim-treesitter)
-- install vim plugins (vim-plug)
-- install nvim plugins and treesitter parsers (lazy.nvim)
-- set macos defaults (if on macos)
-- symlink .aws/.azure from windows (if on wsl)
+## requirements
+
+- neovim 0.10+
+- gcc (treesitter parsers)
+- curl, tar
+
+```bash
+# macos
+brew install neovim gcc
+
+# ubuntu/wsl
+sudo add-apt-repository -y ppa:neovim-ppa/unstable
+sudo apt update && sudo apt install -y neovim build-essential
+```
 
 ## structure
 
 ```
-bashrc          # main shell config
+bashrc          # shared shell config (aliases, functions, env)
 bash_profile    # sources bashrc
+zshrc           # zsh config (sources bashrc, adds zsh-specifics)
 vimrc           # vim config
 vim/            # vim plugins (vim-plug)
 nvim/           # neovim config (lua, lazy.nvim)
@@ -50,22 +45,19 @@ bics-plugins/   # bash plugins (submodules)
 
 ## local overrides
 
-create these files for machine-specific config (not tracked):
+machine-specific config (not tracked):
 
 ```
-~/.bashrc.local      # local bash config (cuda, etc)
+~/.bashrc.local      # bash-specific local config
+~/.zshrc.local       # zsh-specific local config (homebrew, nvm, etc)
 ~/.bash_aliases      # local aliases
-~/.gitconfig.local   # local git config (signing, etc)
+~/.gitconfig.local   # local git config
 ```
 
 ## plugins
 
-**bash** - uses [bics](https://github.com/bahamas10/bics):
-- `bash-path` - path_add, path_remove, path_clean
+**bash** - [bics](https://github.com/bahamas10/bics) for path management
 
-**vim** - uses [vim-plug](https://github.com/junegunn/vim-plug):
-- run `:PlugInstall` to install
+**vim** - [vim-plug](https://github.com/junegunn/vim-plug), run `:PlugInstall`
 
-**nvim** - uses [lazy.nvim](https://github.com/folke/lazy.nvim):
-- plugins auto-install on first launch
-- run `:Lazy sync` to update
+**nvim** - [lazy.nvim](https://github.com/folke/lazy.nvim), auto-installs on first launch
