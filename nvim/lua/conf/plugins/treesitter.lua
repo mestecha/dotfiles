@@ -1,39 +1,44 @@
 return {
-  "nvim-treesitter/nvim-treesitter",
-  build = ":TSUpdate",
+	"nvim-treesitter/nvim-treesitter",
+	build = ":TSUpdate",
 
-  config = function()
-    require("nvim-treesitter.configs").setup({
-        ensure_installed = {
-          "c",
-          "cpp",
-          "python",
-          "html",
-          "css",
-          "matlab",
-          "javascript",
-          "lua",
-          "vim",
-          "vimdoc",
-          "query"
-        },
+	config = function()
+		-- new API: just install parsers, highlighting is built into neovim
+		require("nvim-treesitter").setup({})
 
-        sync_install = false,
-        auto_install = true,
+		-- install parsers
+		local parsers = {
+			"c",
+			"cpp",
+			"python",
+			"html",
+			"css",
+			"javascript",
+			"lua",
+			"vim",
+			"vimdoc",
+			"query",
+			"bash",
+			"markdown",
+		}
 
-        autopairs = {
-          enable = true,
-        },
+		-- auto-install missing parsers
+		vim.api.nvim_create_autocmd("FileType", {
+			callback = function(args)
+				local ft = args.match
+				local lang = vim.treesitter.language.get_lang(ft) or ft
+				if vim.tbl_contains(parsers, lang) then
+					pcall(vim.treesitter.start)
+				end
+			end,
+		})
 
-        highlight = {
-          enable = true,
-          additional_vim_regex_highlighting = false,
-        },
-
-        indent = {
-          enable = true,
-          --disable = { "python", "c" } -- these and some other langs don't work well
-        },
-      })
-  end
+		-- install parsers on startup
+		for _, parser in ipairs(parsers) do
+			local ok = pcall(vim.treesitter.language.add, parser)
+			if not ok then
+				vim.fn.system({ "nvim", "--headless", "-c", "TSInstall " .. parser, "-c", "q" })
+			end
+		end
+	end,
 }
