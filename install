@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+#
+# install dotfiles by symlinking them
+# updating is as simple as git pull
+#
+
+symlink() {
+	printf '%55s -> %s\n' "${1/#$HOME/\~}" "${2/#$HOME/\~}"
+	ln -nsf "$@"
+}
+
+# init submodules
+git submodule init
+git submodule update
+
+# dotfiles to link
+dotfiles=(
+	bashrc
+	bash_profile
+	inputrc
+	tmux.conf
+	vimrc
+	vim
+)
+
+# gitconfig protected behind -f flag
+if [[ $1 == '-f' ]]; then
+	dotfiles+=(gitconfig)
+fi
+
+# symlink dotfiles
+for f in "${dotfiles[@]}"; do
+	# remove non-symlink directories
+	[[ -d ~/.$f && ! -L ~/.$f ]] && rm -r ~/."$f"
+	symlink "$PWD/$f" ~/."$f"
+done
+
+# nvim config (separate from vim)
+mkdir -p ~/.config
+symlink "$PWD/nvim" ~/.config/nvim
+
+# setup bics
+if [[ ! -d ~/.bics ]]; then
+	echo 'installing bics'
+	bash <(curl -sSL https://raw.githubusercontent.com/bahamas10/bics/master/bics) init
+	rm -r ~/.bics/plugins
+	symlink "$PWD/bics-plugins" ~/.bics/plugins
+fi
+
+# wsl-specific: symlink .aws and .azure from windows
+if grep -qEi '(Microsoft|WSL)' /proc/version 2>/dev/null; then
+	win_user=${WIN_USER:-$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')}
+	win_home="/mnt/c/Users/$win_user"
+	[[ -d "$win_home/.aws" ]] && symlink "$win_home/.aws" ~/.aws
+	[[ -d "$win_home/.azure" ]] && symlink "$win_home/.azure" ~/.azure
+fi
+
+# macos defaults
+if [[ $(uname) == 'Darwin' ]]; then
+	echo 'setting macos defaults'
+
+	# keyboard
+	# disable autocorrect
+	defaults write -g NSAutomaticSpellingCorrectionEnabled -bool false
+	# disable auto-capitalization
+	defaults write -g NSAutomaticCapitalizationEnabled -bool false
+	# fast key repeat
+	defaults write -g InitialKeyRepeat -int 15
+	defaults write -g KeyRepeat -int 2
+	# disable press-and-hold for accents
+	defaults write -g ApplePressAndHoldEnabled -bool false
+
+	# finder
+	# show all extensions
+	defaults write -g AppleShowAllExtensions -bool true
+	# show status bar
+	defaults write com.apple.finder ShowStatusBar -bool true
+	# show full path in title
+	defaults write com.apple.finder _FXShowPosixPathInTitle -bool true
+
+	# dock
+	# autohide
+	defaults write com.apple.dock autohide -bool true
+	# left side
+	defaults write com.apple.dock orientation -string left
+	# no recent apps
+	defaults write com.apple.dock show-recents -bool false
+
+	# trackpad
+	# tap to click
+	defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -int 1
+	defaults write com.apple.AppleMultitouchTrackpad Clicking -int 1
+
+	echo 'restarting dock and finder'
+	killall Dock Finder
+fi
+
+# install vim plugins
+if command -v vim &>/dev/null; then
+	echo 'installing vim plugins'
+	vim +PlugInstall +qall
+fi
+
+true
