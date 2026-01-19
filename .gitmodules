@@ -1,0 +1,3 @@
+[submodule "bics-plugins/bash-path"]
+	path = bics-plugins/bash-path
+	url = https://github.com/bahamas10/bash-path
