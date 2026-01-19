@@ -1,0 +1,26 @@
+# secrets - never commit
+.exports.local
+.bashrc.local
+.gitconfig.local
+
+# ssh
+.ssh/
+*.pem
+*.key
+id_*
+
+# cloud credentials
+.aws/
+.azure/
+
+# history
+.bash_history
+.lesshst
+
+# editor
+*.swp
+*.swo
+*~
+.DS_Store
+
+# don't ignore gitconfig (protected by -f flag instead)
