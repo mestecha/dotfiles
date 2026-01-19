@@ -201,17 +201,23 @@ set_prompt_colors() {
 
 # exit code if non-zero
 PS1='$(ret=$?;(($ret!=0)) && echo "\[${COLOR256[0]}\]($ret) \[${COLOR256[256]}\]")'
+
 # username (red if root)
 PS1+='\[${PROMPT_COLORS[0]}\]\[${COLOR256[257]}\]$(((UID==0)) && echo "\[${COLOR256[0]}\]")\u\[${COLOR256[256]}\] - '
+
 # hostname
 PS1+='\[${PROMPT_COLORS[3]}\]\h '
+
 # uname
 PS1+='\[${PROMPT_COLORS[2]}\]'"$(uname | tr '[:upper:]' '[:lower:]')"' '
+
 # working directory
 PS1+='\[${PROMPT_COLORS[5]}\]\w '
+
 # git branch (optional)
 PS1+='$(branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); [[ -n $branch ]] && echo "\[${PROMPT_COLORS[2]}\](\[${PROMPT_COLORS[3]}\]git:$branch\[${PROMPT_COLORS[2]}\]) ")'
-# $ prompt
+
+# $ prompt character
 PS1+='\[${PROMPT_COLORS[0]}\]\$\[${COLOR256[256]}\] '
 
 set_prompt_colors 24
@@ -266,6 +272,14 @@ colors() {
 	tput sgr0
 }
 
+# copy stdin to the clipboard
+copy() {
+	pbcopy 2>/dev/null ||
+	    xsel 2>/dev/null ||
+	    clip.exe
+
+}
+
 # convert unix timestamp to readable date
 epoch() {
 	# default: current time
@@ -276,6 +290,34 @@ epoch() {
 # mkdir and cd into it
 mcd() {
 	mkdir -p "$1" && cd "$1"
+}
+
+# open the current path or file in GitHub
+gho() {
+	local file=$1
+	local remote=${2:-origin}
+
+	# get the git root dir, branch, and remote URL
+	local gr=$(git rev-parse --show-toplevel)
+	local branch=$(git rev-parse --abbrev-ref HEAD)
+	local url=$(git config --get "remote.$remote.url")
+
+	[[ -n $gr && -n $branch && -n $remote ]] || return 1
+
+	# construct the path
+	local path=${PWD/#$gr/}
+	[[ -n $file ]] && path+=/$file
+
+	# extract the username and repo name
+	local a
+	IFS=:/ read -a a <<< "$url"
+	local len=${#a[@]}
+	local user=${a[len-2]}
+	local repo=${a[len-1]%.git}
+
+	url="https://github.com/$user/$repo/tree/$branch$path"
+	echo "$url"
+	open "$url"
 }
 
 # extract common archive formats
@@ -301,8 +343,56 @@ extract() {
 	fi
 }
 
+# platform-independent interfaces
+interfaces() {
+	node <<-EOF
+	var os = require('os');
+	var i = os.networkInterfaces();
+	Object.keys(i).forEach(function(name) {
+		i[name].forEach(function(int) {
+			if (int.family === 'IPv4') {
+				console.log('%s: %s', name, int.address);
+			}
+		});
+	});
+	EOF
+}
+
+# calculate CPU load / Core Count
+load() {
+	node -p <<-EOF
+	var os = require('os');
+	var c = os.cpus().length;
+	os.loadavg().map(function(l) {
+		return (l/c).toFixed(2);
+	}).join(' ');
+	EOF
+}
+
+# platform-independent memory usage
+meminfo() {
+	node <<-EOF
+	var os = require('os');
+	var free = os.freemem();
+	var total = os.totalmem();
+	var used = total - free;
+	console.log('memory: %dmb / %dmb (%d%%)',
+	    Math.round(used / 1024 / 1024),
+	    Math.round(total / 1024 / 1024),
+	    Math.round(used * 100 / total));
+	EOF
+}
+
+# print lines over X columns (defaults to 80)
+over() {
+	awk -v c="${1:-80}" 'length($0) > c {
+		printf("%4d %s\n", NR, $0);
+	}'
+}
+
 # local overrides (not tracked in git)
 . ~/.bashrc.local 2>/dev/null || true
+. ~/.bash_aliases    2>/dev/null || true
 
 # load bash completion
 . /etc/bash_completion 2>/dev/null ||
