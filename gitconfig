@@ -1,0 +1,22 @@
+#
+# gitconfig
+#
+# protected by -f flag in install script
+#
+
+[user]
+	name = mestecha
+	email = marcos.estecha.garitagoitia@gmail.com
+
+[color]
+	ui = auto
+
+[push]
+	default = current
+
+[pull]
+	rebase = false
+
+# local overrides (signing keys, etc)
+[include]
+	path = ~/.gitconfig.local
