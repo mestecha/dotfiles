@@ -101,4 +101,21 @@ if command -v vim &>/dev/null; then
 	vim +PlugInstall +qall
 fi
 
+# neovim setup
+if command -v nvim &>/dev/null; then
+	# tree-sitter-cli required for nvim-treesitter to compile parsers
+	if ! command -v tree-sitter &>/dev/null; then
+		echo 'installing tree-sitter-cli'
+		mkdir -p ~/.local/bin
+		curl -sL https://github.com/tree-sitter/tree-sitter/releases/latest/download/tree-sitter-linux-x64.gz |
+			gunzip > ~/.local/bin/tree-sitter
+		chmod +x ~/.local/bin/tree-sitter
+	fi
+
+	# install lazy.nvim plugins and treesitter parsers
+	echo 'installing nvim plugins and parsers'
+	nvim --headless "+Lazy! sync" +qa 2>/dev/null
+	nvim --headless "+TSInstall! vimdoc lua vim query bash python" "+sleep 30" +qa 2>/dev/null
+fi
+
 true
