@@ -24,3 +24,4 @@ id_*
 .DS_Store
 
 # don't ignore gitconfig (protected by -f flag instead)
+vim/plugged/
