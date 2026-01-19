@@ -17,6 +17,7 @@ git submodule update
 dotfiles=(
 	bashrc
 	bash_profile
+	zshrc
 	inputrc
 	tmux.conf
 	vimrc

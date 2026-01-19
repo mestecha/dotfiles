@@ -9,8 +9,10 @@
 # exit early if not interactive
 [[ -n $PS1 ]] || return
 
-# load bics plugin manager
-. ~/.bics/bics || echo '> failed to load bics' >&2
+# load bics plugin manager (bash-only, provides path_add/path_clean)
+if [[ -n $BASH_VERSION ]]; then
+	. ~/.bics/bics || echo '> failed to load bics' >&2
+fi
 
 # environment
 export EDITOR='vim'
@@ -56,24 +58,28 @@ export LESS_TERMCAP_ZO=$(tput ssupm)
 # end superscript
 export LESS_TERMCAP_ZW=$(tput rsupm)
 
-# path
-path_add ~/bin before
-path_add ~/.local/bin before
-path_add ~/.cargo/bin before
+# path (path_add provided by bics, bash-only)
+if [[ -n $BASH_VERSION ]]; then
+	path_add ~/bin before
+	path_add ~/.local/bin before
+	path_add ~/.cargo/bin before
+fi
 
-# shell options
-# autocorrect typos in cd
-shopt -s cdspell
-# update LINES/COLUMNS after each command
-shopt -s checkwinsize
-# extended pattern matching
-shopt -s extglob
+# bash-specific shell options
+if [[ -n $BASH_VERSION ]]; then
+	# autocorrect typos in cd
+	shopt -s cdspell
+	# update LINES/COLUMNS after each command
+	shopt -s checkwinsize
+	# extended pattern matching
+	shopt -s extglob
 
-# bash 4+ options
-# cd by typing directory name
-shopt -s autocd   2>/dev/null || true
-# autocorrect directory typos
-shopt -s dirspell 2>/dev/null || true
+	# bash 4+ options
+	# cd by typing directory name
+	shopt -s autocd   2>/dev/null || true
+	# autocorrect directory typos
+	shopt -s dirspell 2>/dev/null || true
+fi
 
 # typo aliases
 alias ..='echo "cd .."; cd ..'
@@ -166,77 +172,80 @@ gmm() {
 	git merge "$mb"
 }
 
-# prompt colors using 256-color palette
-COLOR256=()
-# red for errors
-COLOR256[0]=$(tput setaf 1)
-# reset
-COLOR256[256]=$(tput sgr0)
-# bold
-COLOR256[257]=$(tput bold)
+# bash-specific prompt
+if [[ -n $BASH_VERSION ]]; then
+	# prompt colors using 256-color palette
+	COLOR256=()
+	# red for errors
+	COLOR256[0]=$(tput setaf 1)
+	# reset
+	COLOR256[256]=$(tput sgr0)
+	# bold
+	COLOR256[257]=$(tput bold)
 
-PROMPT_COLORS=()
+	PROMPT_COLORS=()
 
-# generate prompt color palette from 256 colors
-set_prompt_colors() {
-	local h=${1:-0}
-	local color=
-	local i=0
-	local j=0
-	for i in {22..231}; do
-		((i % 30 == h)) || continue
+	# generate prompt color palette from 256 colors
+	set_prompt_colors() {
+		local h=${1:-0}
+		local color=
+		local i=0
+		local j=0
+		for i in {22..231}; do
+			((i % 30 == h)) || continue
 
-		color=${COLOR256[$i]}
-		if [[ -z $color ]]; then
-			COLOR256[$i]=$(tput setaf "$i")
 			color=${COLOR256[$i]}
-		fi
-		PROMPT_COLORS[$j]=$color
-		((j++))
-	done
-}
+			if [[ -z $color ]]; then
+				COLOR256[$i]=$(tput setaf "$i")
+				color=${COLOR256[$i]}
+			fi
+			PROMPT_COLORS[$j]=$color
+			((j++))
+		done
+	}
 
-# build prompt
-# format: (exit code) user - hostname os working/dir (git:branch) $
+	# build prompt
+	# format: (exit code) user - hostname os working/dir (git:branch) $
 
-# exit code if non-zero
-PS1='$(ret=$?;(($ret!=0)) && echo "\[${COLOR256[0]}\]($ret) \[${COLOR256[256]}\]")'
+	# exit code if non-zero
+	PS1='$(ret=$?;(($ret!=0)) && echo "\[${COLOR256[0]}\]($ret) \[${COLOR256[256]}\]")'
 
-# username (red if root)
-PS1+='\[${PROMPT_COLORS[0]}\]\[${COLOR256[257]}\]$(((UID==0)) && echo "\[${COLOR256[0]}\]")\u\[${COLOR256[256]}\] - '
+	# username (red if root)
+	PS1+='\[${PROMPT_COLORS[0]}\]\[${COLOR256[257]}\]$(((UID==0)) && echo "\[${COLOR256[0]}\]")\u\[${COLOR256[256]}\] - '
 
-# hostname
-PS1+='\[${PROMPT_COLORS[3]}\]\h '
+	# hostname
+	PS1+='\[${PROMPT_COLORS[3]}\]\h '
 
-# uname
-PS1+='\[${PROMPT_COLORS[2]}\]'"$(uname | tr '[:upper:]' '[:lower:]')"' '
+	# uname
+	PS1+='\[${PROMPT_COLORS[2]}\]'"$(uname | tr '[:upper:]' '[:lower:]')"' '
 
-# working directory
-PS1+='\[${PROMPT_COLORS[5]}\]\w '
+	# working directory
+	PS1+='\[${PROMPT_COLORS[5]}\]\w '
 
-# git branch (optional)
-PS1+='$(branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); [[ -n $branch ]] && echo "\[${PROMPT_COLORS[2]}\](\[${PROMPT_COLORS[3]}\]git:$branch\[${PROMPT_COLORS[2]}\]) ")'
+	# git branch (optional)
+	PS1+='$(branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); [[ -n $branch ]] && echo "\[${PROMPT_COLORS[2]}\](\[${PROMPT_COLORS[3]}\]git:$branch\[${PROMPT_COLORS[2]}\]) ")'
 
-# $ prompt character
-PS1+='\[${PROMPT_COLORS[0]}\]\$\[${COLOR256[256]}\] '
+	# $ prompt character
+	PS1+='\[${PROMPT_COLORS[0]}\]\$\[${COLOR256[256]}\] '
 
-set_prompt_colors 24
+	set_prompt_colors 24
 
-# set terminal title: [ssh] user@host:path
-_prompt_command() {
-	local user=$USER
-	# short hostname
-	local host=${HOSTNAME%%.*}
-	# replace home with ~
-	local pwd=${PWD/#$HOME/\~}
-	local ssh=
-	[[ -n $SSH_CLIENT ]] && ssh='[ssh] '
-	printf '\033]0;%s%s@%s:%s\007' "$ssh" "$user" "$host" "$pwd"
-}
-PROMPT_COMMAND=_prompt_command
+	# set terminal title: [ssh] user@host:path
+	_prompt_command() {
+		local user=$USER
+		# short hostname
+		local host=${HOSTNAME%%.*}
+		# replace home with ~
+		local pwd=${PWD/#$HOME/\~}
+		local ssh=
+		[[ -n $SSH_CLIENT ]] && ssh='[ssh] '
+		printf '\033]0;%s%s@%s:%s\007' "$ssh" "$user" "$host" "$pwd"
+	}
+	PROMPT_COMMAND=_prompt_command
 
-# show last 6 dirs in prompt
-PROMPT_DIRTRIM=6
+	# show last 6 dirs in prompt
+	PROMPT_DIRTRIM=6
+fi
 
 # colored diff output
 colordiff() {
@@ -395,12 +404,14 @@ over() {
 . ~/.bash_aliases    2>/dev/null || true
 
 # load bash completion
-. /etc/bash_completion 2>/dev/null ||
-	. /usr/share/bash-completion/bash_completion 2>/dev/null ||
-	. ~/.bash_completion 2>/dev/null ||
-	true
+if [[ -n $BASH_VERSION ]]; then
+	. /etc/bash_completion 2>/dev/null ||
+		. /usr/share/bash-completion/bash_completion 2>/dev/null ||
+		. ~/.bash_completion 2>/dev/null ||
+		true
+fi
 
-# remove duplicate path entries
-path_clean
+# remove duplicate path entries (path_clean provided by bics)
+[[ -n $BASH_VERSION ]] && path_clean
 
 true
