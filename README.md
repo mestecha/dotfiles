@@ -15,9 +15,11 @@ cd ~/dotfiles
 
 ## requirements
 
-- neovim 0.10+
+- neovim 0.11+
 - gcc (treesitter parsers)
 - curl, tar
+- nerd font (icons)
+- clang-format (optional, for c++ formatting)
 
 ```bash
 # macos
@@ -36,11 +38,19 @@ bash_profile    # sources bashrc
 zshrc           # zsh config (sources bashrc, adds zsh-specifics)
 vimrc           # vim config
 vim/            # vim plugins (vim-plug)
-nvim/           # neovim config (lua, lazy.nvim)
 tmux.conf       # tmux config
 inputrc         # readline config
 gitconfig       # git config (use -f to install)
 bics-plugins/   # bash plugins (submodules)
+```
+
+## neovim
+
+nvim config is in a separate repo: [mestecha/nvim](https://github.com/mestecha/nvim)
+
+```bash
+git clone https://github.com/mestecha/nvim.git ~/nvim
+cd ~/nvim && ./install
 ```
 
 ## local overrides
@@ -59,5 +69,3 @@ machine-specific config (not tracked):
 **bash** - [bics](https://github.com/bahamas10/bics) for path management
 
 **vim** - [vim-plug](https://github.com/junegunn/vim-plug), run `:PlugInstall`
-
-**nvim** - [lazy.nvim](https://github.com/folke/lazy.nvim), auto-installs on first launch

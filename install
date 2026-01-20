@@ -104,19 +104,38 @@ fi
 
 # neovim setup
 if command -v nvim &>/dev/null; then
-	# tree-sitter-cli required for nvim-treesitter to compile parsers
-	if ! command -v tree-sitter &>/dev/null; then
-		echo 'installing tree-sitter-cli'
-		mkdir -p ~/.local/bin
-		curl -sL https://github.com/tree-sitter/tree-sitter/releases/latest/download/tree-sitter-linux-x64.gz |
-			gunzip > ~/.local/bin/tree-sitter
-		chmod +x ~/.local/bin/tree-sitter
+	if [[ -d ~/nvim ]]; then
+		# use separate nvim repo
+		echo 'nvim repo found at ~/nvim'
+		if [[ -x ~/nvim/install ]]; then
+			(cd ~/nvim && ./install)
+		fi
+	elif [[ -d "$PWD/nvim" ]]; then
+		# fallback: use nvim from dotfiles (legacy)
+		symlink "$PWD/nvim" ~/.config/nvim
+		# tree-sitter-cli
+		if ! command -v tree-sitter &>/dev/null; then
+			echo 'installing tree-sitter-cli'
+			mkdir -p ~/.local/bin
+			case "$(uname -s)-$(uname -m)" in
+				Linux-x86_64) ts_file="tree-sitter-linux-x64.gz" ;;
+				Darwin-arm64) ts_file="tree-sitter-macos-arm64.gz" ;;
+				Darwin-x86_64) ts_file="tree-sitter-macos-x64.gz" ;;
+				*) ts_file="" ;;
+			esac
+			if [[ -n $ts_file ]]; then
+				curl -sL "https://github.com/tree-sitter/tree-sitter/releases/latest/download/$ts_file" |
+					gunzip > ~/.local/bin/tree-sitter
+				chmod +x ~/.local/bin/tree-sitter
+			fi
+		fi
+		echo 'installing nvim plugins'
+		nvim --headless -c "Lazy sync" -c "qa" 2>/dev/null || true
+	else
+		# offer to clone nvim repo
+		echo 'nvim config not found'
+		echo 'clone with: git clone https://github.com/mestecha/nvim.git ~/nvim && ~/nvim/install'
 	fi
-
-	# install lazy.nvim plugins and treesitter parsers
-	echo 'installing nvim plugins and parsers'
-	nvim --headless "+Lazy! sync" +qa 2>/dev/null
-	nvim --headless "+TSInstall! vimdoc lua vim query bash python" "+sleep 30" +qa 2>/dev/null
 fi
 
 true
