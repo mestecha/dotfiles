@@ -4,14 +4,17 @@
 # updating is as simple as git pull
 #
 
+# get script directory (works even when called from different location)
+script_dir=$(cd "$(dirname "$0")" && pwd) || exit
+
 symlink() {
 	printf '%55s -> %s\n' "${1/#$HOME/\~}" "${2/#$HOME/\~}"
 	ln -nsf "$@"
 }
 
-# init submodules
-git submodule init
-git submodule update
+# init submodules (run from script directory for git commands)
+git -C "$script_dir" submodule init
+git -C "$script_dir" submodule update
 
 # dotfiles to link
 dotfiles=(
@@ -33,20 +36,20 @@ fi
 for f in "${dotfiles[@]}"; do
 	# remove non-symlink directories
 	[[ -d ~/.$f && ! -L ~/.$f ]] && rm -r ~/."$f"
-	symlink "$PWD/$f" ~/."$f"
+	symlink "$script_dir/$f" ~/."$f"
 done
 
-# nvim config (separate from vim)
+# ensure ~/.config exists for nvim setup later
 mkdir -p ~/.config
-symlink "$PWD/nvim" ~/.config/nvim
 
 # setup bics
 if [[ ! -d ~/.bics ]]; then
 	echo 'installing bics'
 	bash <(curl -sSL https://raw.githubusercontent.com/bahamas10/bics/master/bics) init
 	rm -r ~/.bics/plugins
-	symlink "$PWD/bics-plugins" ~/.bics/plugins
 fi
+# always update bics-plugins symlink (in case dotfiles moved)
+[[ -d ~/.bics ]] && symlink "$script_dir/bics-plugins" ~/.bics/plugins
 
 # wsl-specific: symlink .aws and .azure from windows
 if grep -qEi '(Microsoft|WSL)' /proc/version 2>/dev/null; then
@@ -110,27 +113,6 @@ if command -v nvim &>/dev/null; then
 		if [[ -x ~/nvim/install ]]; then
 			(cd ~/nvim && ./install)
 		fi
-	elif [[ -d "$PWD/nvim" ]]; then
-		# fallback: use nvim from dotfiles (legacy)
-		symlink "$PWD/nvim" ~/.config/nvim
-		# tree-sitter-cli
-		if ! command -v tree-sitter &>/dev/null; then
-			echo 'installing tree-sitter-cli'
-			mkdir -p ~/.local/bin
-			case "$(uname -s)-$(uname -m)" in
-				Linux-x86_64) ts_file="tree-sitter-linux-x64.gz" ;;
-				Darwin-arm64) ts_file="tree-sitter-macos-arm64.gz" ;;
-				Darwin-x86_64) ts_file="tree-sitter-macos-x64.gz" ;;
-				*) ts_file="" ;;
-			esac
-			if [[ -n $ts_file ]]; then
-				curl -sL "https://github.com/tree-sitter/tree-sitter/releases/latest/download/$ts_file" |
-					gunzip > ~/.local/bin/tree-sitter
-				chmod +x ~/.local/bin/tree-sitter
-			fi
-		fi
-		echo 'installing nvim plugins'
-		nvim --headless -c "Lazy sync" -c "qa" 2>/dev/null || true
 	else
 		# offer to clone nvim repo
 		echo 'nvim config not found'
