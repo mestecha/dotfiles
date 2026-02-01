@@ -15,20 +15,9 @@ cd ~/dotfiles
 
 ## requirements
 
-- neovim 0.11+
-- gcc (treesitter parsers)
-- curl, tar
-- nerd font (icons)
-- clang-format (optional, for c++ formatting)
-
-```bash
-# macos
-brew install neovim gcc
-
-# ubuntu/wsl
-sudo add-apt-repository -y ppa:neovim-ppa/unstable
-sudo apt update && sudo apt install -y neovim build-essential
-```
+- bash
+- git (submodules)
+- curl (bics install)
 
 ## structure
 
