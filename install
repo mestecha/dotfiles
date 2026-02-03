@@ -44,9 +44,13 @@ mkdir -p ~/.config
 
 # setup bics
 if [[ ! -d ~/.bics ]]; then
-	echo 'installing bics'
-	bash <(curl -sSL https://raw.githubusercontent.com/bahamas10/bics/master/bics) init
-	rm -r ~/.bics/plugins
+	if command -v curl &>/dev/null; then
+		echo 'installing bics'
+		bash <(curl -sSL https://raw.githubusercontent.com/bahamas10/bics/master/bics) init
+		[[ -d ~/.bics/plugins ]] && rm -r ~/.bics/plugins
+	else
+		echo 'skipping bics (curl not found)'
+	fi
 fi
 # always update bics-plugins symlink (in case dotfiles moved)
 [[ -d ~/.bics ]] && symlink "$script_dir/bics-plugins" ~/.bics/plugins
