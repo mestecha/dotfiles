@@ -45,9 +45,11 @@ mkdir -p ~/.config
 # setup bics
 if [[ ! -d ~/.bics ]]; then
 	if command -v curl &>/dev/null; then
-		echo 'installing bics'
-		bash <(curl -sSL https://raw.githubusercontent.com/bahamas10/bics/master/bics) init
-		[[ -d ~/.bics/plugins ]] && rm -r ~/.bics/plugins
+		read -rp 'install bics? [y/N] ' answer
+		if [[ $answer == [yY] ]]; then
+			bash <(curl -sSL https://raw.githubusercontent.com/bahamas10/bics/master/bics) init
+			[[ -d ~/.bics/plugins ]] && rm -r ~/.bics/plugins
+		fi
 	else
 		echo 'skipping bics (curl not found)'
 	fi
