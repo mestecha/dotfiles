@@ -9,10 +9,36 @@
 # exit early if not interactive
 [[ -n $PS1 ]] || return
 
-# load bics plugin manager (bash-only, provides path_add/path_clean)
-if [[ -n $BASH_VERSION ]]; then
-	. ~/.bics/bics || echo '> failed to load bics' >&2
-fi
+# path utilities (append/prepend to colon-separated vars, deduplicate)
+path_add() {
+	local p=$1 dir=${2:-after} var=${3:-PATH}
+	local arr
+	[[ -z $p || $p == *:* ]] && return 1
+	IFS=: read -ra arr <<< "${!var}:"
+	case "$dir" in
+		after) arr=("${arr[@]}" "$p");;
+		*) arr=("$p" "${arr[@]}");;
+	esac
+	local IFS=:
+	read -r "${var?}" <<< "${arr[*]}"
+}
+
+path_clean() {
+	local var=${1:-PATH}
+	local arr newarr=()
+	declare -A seen
+	IFS=: read -ra arr <<< "${!var}:"
+	local p
+	for p in "${arr[@]}"; do
+		[[ -z $p || ${p:0:1} != '/' ]] && continue
+		p=$(cd "$p" &>/dev/null && echo "$PWD") || continue
+		[[ -z $p || -n ${seen[$p]} ]] && continue
+		seen[$p]=true
+		newarr+=("$p")
+	done
+	local IFS=:
+	read -r "${var?}" <<< "${newarr[*]}"
+}
 
 # environment
 export EDITOR='vim'
@@ -58,12 +84,10 @@ export LESS_TERMCAP_ZO=$(tput ssupm)
 # end superscript
 export LESS_TERMCAP_ZW=$(tput rsupm)
 
-# path (path_add provided by bics, bash-only)
-if [[ -n $BASH_VERSION ]]; then
-	path_add ~/bin before
-	path_add ~/.local/bin before
-	path_add ~/.cargo/bin before
-fi
+# path
+path_add ~/bin before
+path_add ~/.local/bin before
+path_add ~/.cargo/bin before
 
 # bash-specific shell options
 if [[ -n $BASH_VERSION ]]; then
@@ -411,7 +435,7 @@ if [[ -n $BASH_VERSION ]]; then
 		true
 fi
 
-# remove duplicate path entries (path_clean provided by bics)
-[[ -n $BASH_VERSION ]] && path_clean
+# remove duplicate path entries
+path_clean
 
 true
