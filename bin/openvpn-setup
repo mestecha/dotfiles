@@ -1,0 +1,204 @@
+#!/usr/bin/env bash
+#
+# openvpn-setup - first-time OpenVPN3 setup on a new machine
+#
+# Usage: openvpn-setup <config.ovpn>
+#
+# This script will:
+#   1. Install openvpn3 from the official repo
+#   2. Prompt for VPN credentials and store them securely
+#   3. Import the config as a persistent profile
+#   4. Enable autostart on boot
+#
+
+PROFILE='openvpn-config'
+SERVICE="openvpn3-session@${PROFILE}.service"
+CRED_DIR='/etc/openvpn3'
+CRED_FILE="${CRED_DIR}/credentials.txt"
+PROG=${0##*/}
+
+usage() {
+	cat <<-EOF
+	Usage: $PROG <config.ovpn>
+
+	Sets up OpenVPN3 with autostart on boot.
+	Run this once on a fresh machine.
+	EOF
+}
+
+die() {
+	echo "error: $*" >&2
+	exit 1
+}
+
+install_openvpn3() {
+	local codename=$1
+
+	sudo apt install -y apt-transport-https curl || die 'failed to install dependencies'
+
+	sudo mkdir -p /etc/apt/keyrings
+	curl -fsSL https://packages.openvpn.net/packages-repo.gpg \
+		| sudo tee /etc/apt/keyrings/openvpn.asc > /dev/null \
+		|| die 'failed to fetch GPG key'
+
+	echo "deb [signed-by=/etc/apt/keyrings/openvpn.asc] https://packages.openvpn.net/openvpn3/debian $codename main" \
+		| sudo tee /etc/apt/sources.list.d/openvpn3.list > /dev/null \
+		|| die 'failed to add repository'
+
+	sudo apt update || die 'apt update failed'
+	sudo apt install -y openvpn3 || die 'failed to install openvpn3'
+
+	echo 'openvpn3 installed'
+}
+
+setup_credentials() {
+	local config=$1
+
+	echo '--- Credentials ---'
+	echo 'This config requires username/password authentication.'
+	echo "Credentials will be stored in $CRED_FILE (root-only, mode 600)."
+	echo ''
+
+	read -rp 'VPN Username: ' vpn_user
+	[[ -n $vpn_user ]] || die 'username cannot be empty'
+
+	read -rsp 'VPN Password: ' vpn_pass
+	echo ''
+	[[ -n $vpn_pass ]] || die 'password cannot be empty'
+
+	sudo mkdir -p "$CRED_DIR"
+	printf '%s\n%s\n' "$vpn_user" "$vpn_pass" \
+		| sudo tee "$CRED_FILE" > /dev/null
+	sudo chmod 600 "$CRED_FILE"
+	sudo chmod 700 "$CRED_DIR"
+
+	echo 'Credentials stored'
+}
+
+import_config() {
+	local config=$1
+	local tmp_config
+
+	# if config has auth-user-pass, point it to the credentials file
+	if grep -q 'auth-user-pass' "$config"; then
+		tmp_config=$(mktemp)
+		while IFS= read -r line; do
+			if [[ $line == auth-user-pass* ]]; then
+				echo "auth-user-pass $CRED_FILE"
+			else
+				echo "$line"
+			fi
+		done < "$config" > "$tmp_config"
+
+		# temporarily open for openvpn3 import
+		sudo chmod 644 "$CRED_FILE"
+		sudo chmod 755 "$CRED_DIR"
+	else
+		tmp_config=$config
+	fi
+
+	# remove existing config if present
+	openvpn3 config-remove --config "$PROFILE" --force 2>/dev/null
+
+	echo '--- Importing config ---'
+	sudo openvpn3 config-import \
+		--config "$tmp_config" \
+		--name "$PROFILE" \
+		--persistent \
+		|| die 'failed to import config'
+
+	# lock credentials back down
+	if [[ -f $CRED_FILE ]]; then
+		sudo chmod 600 "$CRED_FILE"
+		sudo chmod 700 "$CRED_DIR"
+	fi
+
+	# clean up temp file
+	if [[ $tmp_config != "$config" ]]; then
+		rm -f "$tmp_config"
+	fi
+
+	echo 'Config imported'
+}
+
+enable_service() {
+	echo '--- Enabling autostart ---'
+	sudo systemctl enable --now "$SERVICE" || die 'failed to enable service'
+}
+
+verify() {
+	echo ''
+	echo '--- Verification ---'
+	sleep 2
+
+	if systemctl is-active --quiet "$SERVICE"; then
+		echo 'VPN is active and will start on boot'
+		local addr
+		while IFS= read -r line; do
+			if [[ $line == *inet\ * ]]; then
+				addr=${line##*inet }
+				addr=${addr%%/*}
+				echo "Tunnel IP: $addr"
+				break
+			fi
+		done < <(ip -4 addr show tun0 2>/dev/null)
+	else
+		echo 'WARNING: service started but may not be connected yet'
+		echo 'Check with: openvpn logs'
+	fi
+
+	echo ''
+	echo 'Done. Use the "openvpn" command to manage your VPN:'
+	echo '  openvpn status    — check status'
+	echo '  openvpn test      — full diagnostic'
+	echo '  openvpn logs      — view logs'
+	echo '  openvpn help      — all commands'
+}
+
+# --- main ---
+
+if [[ $# -lt 1 ]]; then
+	usage
+	exit 1
+fi
+
+config=$1
+
+[[ -f $config ]] || die "config file not found: $config"
+
+# detect distro
+[[ -f /etc/os-release ]] || die 'cannot detect distro — /etc/os-release not found'
+source /etc/os-release
+
+case $ID in
+	ubuntu|debian)
+		codename=$VERSION_CODENAME
+		;;
+	*)
+		die "unsupported distro: $ID (only ubuntu/debian supported)"
+		;;
+esac
+
+echo "Detected: $PRETTY_NAME ($codename)"
+echo ''
+
+# install
+if command -v openvpn3 &>/dev/null; then
+	echo 'openvpn3 is already installed, skipping installation'
+else
+	install_openvpn3 "$codename"
+fi
+
+echo ''
+
+# credentials
+if grep -q 'auth-user-pass' "$config"; then
+	setup_credentials "$config"
+	echo ''
+fi
+
+# import and enable
+import_config "$config"
+echo ''
+enable_service
+verify

@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+#
+# openvpn - OpenVPN3 diagnostic and management helper
+#
+
+PROFILE='openvpn-config'
+SERVICE="openvpn3-session@${PROFILE}.service"
+PROG=${0##*/}
+
+usage() {
+	cat <<-EOF
+	Usage: $PROG <command>
+
+	Commands:
+	    status      Show service status (default)
+	    start       Start the VPN session
+	    stop        Stop the VPN session
+	    restart     Restart the VPN session
+	    enable      Enable VPN autostart on boot
+	    disable     Disable VPN autostart on boot
+	    logs        Show recent logs (default 50, pass number for more)
+	    follow      Follow logs in real time
+	    ip          Show tunnel interface and assigned IP
+	    sessions    List active openvpn3 sessions
+	    configs     List imported openvpn3 configs
+	    dns         Show DNS resolution for tunnel interface
+	    routes      Show routes through the tunnel
+	    test        Full diagnostic check
+	    help        Show this help message
+	EOF
+}
+
+cmd_status() {
+	systemctl status "$SERVICE" --no-pager
+}
+
+cmd_start() {
+	sudo systemctl start "$SERVICE"
+	echo "VPN started"
+	cmd_status
+}
+
+cmd_stop() {
+	sudo systemctl stop "$SERVICE"
+	echo "VPN stopped"
+}
+
+cmd_restart() {
+	sudo systemctl restart "$SERVICE"
+	echo "VPN restarted"
+	cmd_status
+}
+
+cmd_enable() {
+	sudo systemctl enable "$SERVICE"
+	echo "VPN autostart enabled"
+}
+
+cmd_disable() {
+	sudo systemctl disable "$SERVICE"
+	echo "VPN autostart disabled"
+}
+
+cmd_logs() {
+	local lines=${1:-50}
+	journalctl -eu "$SERVICE" --no-pager -n "$lines"
+}
+
+cmd_follow() {
+	journalctl -fu "$SERVICE"
+}
+
+cmd_ip() {
+	local tun
+	for tun in /sys/class/net/tun*; do
+		if [[ -d $tun ]]; then
+			local iface=${tun##*/}
+			echo "--- $iface ---"
+			ip addr show "$iface" 2>/dev/null
+			return 0
+		fi
+	done
+	echo "No tunnel interface found — VPN may be down"
+	return 1
+}
+
+cmd_sessions() {
+	openvpn3 sessions-list
+}
+
+cmd_configs() {
+	openvpn3 configs-list
+}
+
+cmd_dns() {
+	local tun
+	for tun in /sys/class/net/tun*; do
+		if [[ -d $tun ]]; then
+			local iface=${tun##*/}
+			resolvectl status "$iface" 2>/dev/null || echo "No DNS configured on $iface"
+			return 0
+		fi
+	done
+	echo "No tunnel interface found"
+	return 1
+}
+
+cmd_routes() {
+	local tun
+	for tun in /sys/class/net/tun*; do
+		if [[ -d $tun ]]; then
+			local iface=${tun##*/}
+			echo "--- Routes via $iface ---"
+			ip route show dev "$iface" 2>/dev/null
+			return 0
+		fi
+	done
+	echo "No tunnel interface found"
+	return 1
+}
+
+cmd_test() {
+	local rc=0
+
+	echo '=== Service ==='
+	if systemctl is-active --quiet "$SERVICE"; then
+		echo "  State: active"
+	else
+		echo "  State: inactive/failed"
+		rc=1
+	fi
+
+	if systemctl is-enabled --quiet "$SERVICE" 2>/dev/null; then
+		echo "  Boot:  enabled"
+	else
+		echo "  Boot:  disabled"
+	fi
+
+	echo ''
+	echo '=== Tunnel ==='
+	local found=false
+	local tun
+	for tun in /sys/class/net/tun*; do
+		if [[ -d $tun ]]; then
+			local iface=${tun##*/}
+			found=true
+			local addr
+			addr=$(ip -4 addr show "$iface" 2>/dev/null | grep -oP 'inet \K[0-9.]+')
+			if [[ -n $addr ]]; then
+				echo "  Interface: $iface"
+				echo "  Address:   $addr"
+			else
+				echo "  Interface: $iface (no IPv4 address)"
+				rc=1
+			fi
+		fi
+	done
+	if ! $found; then
+		echo "  No tunnel interface found"
+		rc=1
+	fi
+
+	echo ''
+	echo '=== DNS ==='
+	local dns_tun
+	for dns_tun in /sys/class/net/tun*; do
+		if [[ -d $dns_tun ]]; then
+			local dns_iface=${dns_tun##*/}
+			local dns_servers
+			dns_servers=$(resolvectl dns "$dns_iface" 2>/dev/null)
+			if [[ -n $dns_servers ]]; then
+				echo "  $dns_servers"
+			else
+				echo "  No DNS servers on $dns_iface"
+			fi
+			break
+		fi
+	done
+
+	echo ''
+	echo '=== Routes ==='
+	if $found; then
+		local route_count
+		route_count=$(ip route show dev "${tun##*/}" 2>/dev/null | wc -l)
+		echo "  $route_count routes via ${tun##*/}"
+	else
+		echo "  No tunnel routes"
+	fi
+
+	echo ''
+	echo '=== Connectivity ==='
+	local gw='10.4.2.1'
+	if ping -c 2 -W 2 "$gw" &>/dev/null; then
+		echo "  Gateway ($gw): reachable"
+	else
+		echo "  Gateway ($gw): unreachable"
+		rc=1
+	fi
+
+	echo ''
+	echo '=== Sessions ==='
+	openvpn3 sessions-list 2>/dev/null || echo "  No active sessions"
+
+	echo ''
+	if ((rc == 0)); then
+		echo 'Result: ALL OK'
+	else
+		echo 'Result: ISSUES DETECTED — check above for details'
+	fi
+
+	return $rc
+}
+
+cmd=${1:-status}
+shift 2>/dev/null
+
+case $cmd in
+	status)   cmd_status ;;
+	start)    cmd_start ;;
+	stop)     cmd_stop ;;
+	restart)  cmd_restart ;;
+	enable)   cmd_enable ;;
+	disable)  cmd_disable ;;
+	logs)     cmd_logs "$@" ;;
+	follow)   cmd_follow ;;
+	ip)       cmd_ip ;;
+	sessions) cmd_sessions ;;
+	configs)  cmd_configs ;;
+	dns)      cmd_dns ;;
+	routes)   cmd_routes ;;
+	test)     cmd_test ;;
+	help)     usage ;;
+	*)
+		echo "Unknown command: $cmd" >&2
+		usage >&2
+		exit 1
+		;;
+esac

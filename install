@@ -3,6 +3,10 @@
 # install dotfiles by symlinking them
 # updating is as simple as git pull
 #
+# NOTE: machine-specific config (PATH, env vars, aliases) belongs in .local
+# files (e.g. ~/.bashrc.local, ~/.profile.local), NOT in the main dotfiles.
+# The main dotfiles are repo-managed and should stay portable.
+#
 
 # get script directory (works even when called from different location)
 script_dir=$(cd "$(dirname "$0")" && pwd) || exit
@@ -124,6 +128,26 @@ if [[ $(uname) == 'Darwin' ]]; then
 	echo 'restarting dock and finder'
 	killall Dock Finder
 fi
+
+# symlink bin scripts to ~/.local/bin
+if [[ -d "$script_dir/bin" ]]; then
+	mkdir -p ~/.local/bin
+	for f in "$script_dir/bin"/*; do
+		[[ -f $f ]] || continue
+		symlink "$f" ~/.local/bin/"${f##*/}"
+	done
+fi
+
+# create .local override files if they don't exist
+for f in bashrc profile; do
+	if [[ ! -f ~/."${f}.local" ]]; then
+		cat > ~/."${f}.local" <<-EOF
+		# Machine-specific overrides for .$f
+		# Add PATH entries, env vars, aliases, etc. here — NOT in the main dotfiles.
+		EOF
+		echo "created ~/.$f.local (add machine-specific config here)"
+	fi
+done
 
 # install vim plugins
 if command -v vim &>/dev/null; then
