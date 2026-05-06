@@ -84,10 +84,12 @@ export LESS_TERMCAP_ZO=$(tput ssupm)
 # end superscript
 export LESS_TERMCAP_ZW=$(tput rsupm)
 
-# path
-path_add ~/bin before
-path_add ~/.local/bin before
-path_add ~/.cargo/bin before
+# path (bash-only; zshrc sets path independently)
+if [[ -n $BASH_VERSION ]]; then
+	path_add ~/bin before
+	path_add ~/.local/bin before
+	path_add ~/.cargo/bin before
+fi
 
 # bash-specific shell options
 if [[ -n $BASH_VERSION ]]; then
@@ -435,7 +437,9 @@ if [[ -n $BASH_VERSION ]]; then
 		true
 fi
 
-# remove duplicate path entries
-path_clean
+# remove duplicate path entries (bash-only; zshrc uses typeset -U path)
+if [[ -n $BASH_VERSION ]]; then
+	path_clean
+fi
 
 true
