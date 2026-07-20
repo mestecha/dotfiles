@@ -14,7 +14,7 @@
 [[ -f ~/.bashrc ]] && . ~/.bashrc
 
 # path (bashrc uses bics path_add which is bash-only)
-path=(~/bin ~/.local/bin ~/.cargo/bin $path)
+path=(~/bin ~/.local/bin $path)
 typeset -U path  # remove duplicates
 
 # zsh-specific shell options
