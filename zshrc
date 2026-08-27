@@ -17,6 +17,9 @@
 path=(~/bin ~/.local/bin $path)
 typeset -U path  # remove duplicates
 
+# lazyvim trial config, isolated from ~/.config/nvim
+alias lvim='NVIM_APPNAME=lazyvim nvim'
+
 # zsh-specific shell options
 setopt autocd              # cd by typing directory name
 setopt extendedglob        # extended pattern matching
